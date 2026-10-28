@@ -1,0 +1,74 @@
+-- =====================================================================
+-- 03 — BACKUP, RESSINCRONIZAÇÃO E ROLLBACK  (NADA aqui roda sozinho)
+-- Todos os comandos estão comentados. Rode só o bloco de que precisar,
+-- um de cada vez, depois de ler o aviso.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- A) BACKUP da tabela legada (rode ANTES de publicar o app novo).
+--    Cria uma tabela NOVA; a Planora_dados não é alterada.
+--    O RLS ligado e sem política impede qualquer acesso pela API.
+-- ---------------------------------------------------------------------
+-- create table public.planora_dados_backup_20261026 as table public."Planora_dados";
+-- alter table public.planora_dados_backup_20261026 enable row level security;
+
+-- ---------------------------------------------------------------------
+-- B) RESSINCRONIZAR a cópia (use ANTES de publicar o app novo, só se o
+--    diagnóstico 01 mostrar "dados DIFERENTES da tabela legada" > 0, ou
+--    seja, o app antigo gravou depois da cópia).
+--    ATENÇÃO: sobrescreve Planora_workspace_data dos workspaces iniciais com o
+--    conteúdo atual da Planora_dados. NÃO use depois que o app novo estiver no ar,
+--    senão você apaga o que foi feito nos workspaces.
+-- ---------------------------------------------------------------------
+-- update public."Planora_workspace_data" wd
+--    set dados = d.dados, atualizado_em = now()
+--   from public."Planora_workspaces" w
+--   join public."Planora_dados" d on d.user_id = w.legacy_user_id
+--  where wd.workspace_id = w.id
+--    and wd.dados::jsonb is distinct from d.dados::jsonb;
+
+-- ---------------------------------------------------------------------
+-- C) ROLLBACK do app
+--    1) Volte o front-end para o commit anterior (git revert / redeploy). O app
+--       antigo lê e grava em Planora_dados, que continua intacta.
+--    2) O que foi feito SÓ nos workspaces depois da publicação não existe em
+--       Planora_dados. Se precisar levar o workspace inicial de volta, use o bloco
+--       D (só para os workspaces iniciais, ou seja, legacy_user_id preenchido).
+--    3) Os workspaces extras e as tabelas novas podem ficar como estão: o app
+--       antigo não os usa.
+-- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- D) Exportar o workspace inicial de volta para "Planora_dados" (SÓ em rollback).
+--    ALTERA Planora_dados: faça o backup do bloco A antes.
+-- ---------------------------------------------------------------------
+-- update public."Planora_dados" d
+--    set dados = wd.dados, atualizado_em = now()
+--   from public."Planora_workspaces" w
+--   join public."Planora_workspace_data" wd on wd.workspace_id = w.id
+--  where w.legacy_user_id = d.user_id
+--    and wd.dados::jsonb is distinct from d.dados::jsonb;
+
+-- ---------------------------------------------------------------------
+-- E) OPCIONAL: gatilho para atualizar atualizado_em em qualquer UPDATE
+--    (o app já grava um novo atualizado_em a cada envio; isto só cobre
+--    alterações feitas fora do app, como no SQL Editor).
+-- ---------------------------------------------------------------------
+-- create or replace function public.planora_workspace_data_touch() returns trigger
+-- language plpgsql set search_path = '' as $$
+-- begin new.atualizado_em := now(); return new; end $$;
+-- create trigger planora_workspace_data_touch before update on public."Planora_workspace_data"
+--   for each row execute function public.planora_workspace_data_touch();
+
+-- ---------------------------------------------------------------------
+-- F) ÁREAS: a versão nova guarda as áreas de cada workspace em
+--    dados->'preferencias'->'areas' e, na primeira abertura, troca "Gerais" e
+--    "BI e SSAPM" por "Projeto". Para poder voltar a esse estado, tire ANTES de publicar
+--    uma cópia dos dados dos workspaces (RLS ligado e sem política = inacessível pela API):
+-- create table public.planora_backup_workspace_data_20261027 as table public."Planora_workspace_data";
+-- alter table public.planora_backup_workspace_data_20261027 enable row level security;
+--    Para restaurar UM workspace a partir dessa cópia:
+-- update public."Planora_workspace_data" wd
+--    set dados = b.dados, atualizado_em = now()
+--   from public.planora_backup_workspace_data_20261027 b
+--  where b.workspace_id = wd.workspace_id and wd.workspace_id = '<id-do-workspace>';

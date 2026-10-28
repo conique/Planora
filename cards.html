@@ -1,0 +1,1981 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111316">
+    <title>Planora — Timeline do projeto</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <script>try{if(localStorage.getItem('Planora_tema')==='claro'){document.documentElement.dataset.tema='claro';document.querySelector('meta[name="theme-color"]').content='#f3f5f9'}}catch(e){}</script>
+    <link rel="stylesheet" href="css/style.css?v=20261026-1">
+</head>
+<body>
+
+    <header class="topo" id="topo" data-atual="" data-simples="true"></header>
+<script src="js/header.js?v=20261026-1"></script>
+<div class="cabecalho-pagina">
+        <a href="index.html" class="btn-voltar">‹</a>
+
+        <h1 class="titulo-projeto" id="header-titulo">A carregar...</h1>
+        <span class="tags-header" id="header-tags"></span>
+        <button type="button" class="btn-tag-mais" id="btn-tag-mais" title="Adicionar tag" aria-label="Adicionar tag">+</button>
+
+        <span class="selo selo-rotulo" id="header-status">Em andamento</span>
+        <span class="pilula-area" id="header-area"></span>
+        <span class="pilula-prazo" id="header-prazo" hidden></span>
+        <button type="button" class="btn-editar-dados" id="btn-editar-dados" title="Editar dados" aria-label="Editar dados">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+        </button>
+
+        <div class="painel-edicao" id="painel-edicao" hidden>
+            <label>Título<input id="ed-nome" class="input-inline-tabela" maxlength="120" autocomplete="off"></label>
+            <label>Rótulo<select id="ed-rotulo" class="select-inline-tabela"></select></label>
+            <label>Área<select id="ed-area" class="select-inline-tabela"></select></label>
+            <label>Prazo<input id="ed-prazo" type="date" class="input-inline-tabela"></label>
+            <div class="ed-acoes">
+                <button type="button" class="btn-ordem" id="ed-cancelar">Cancelar</button>
+                <button type="button" class="btn-salvar-inline" id="ed-salvar">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="timeline-container">
+
+        <!-- Formulário Novo Card -->
+        <div class="form-novo-card" id="form-novo-card" hidden>
+
+            <select class="seletor-tipo" id="inputTipoCard">
+                <option value="Atualização">Atualização</option>
+                <option value="Tarefa">Tarefa</option>
+                <option value="Reunião">Reunião</option>
+                <option value="Decisão">Decisão</option>
+            </select>
+
+            <input
+                type="text"
+                class="input-titulo-card"
+                id="inputTituloCard"
+                onpaste="capturarCole(event)"
+                placeholder="Novo card"
+            >
+
+            <textarea
+                class="input-legenda-card"
+                id="inputLegendaCard"
+                onpaste="capturarCole(event)"
+                placeholder="Escreva a legenda ou cole uma imagem/vídeo aqui (Ctrl+V)..."
+                rows="3"
+            ></textarea>
+
+            <div id="container-preview-novo"></div>
+
+            <div style="margin-top: 10px;">
+                <label class="label-file" for="inputMidiaCard">
+                    📁 Inserir Imagem/Vídeo
+                </label>
+
+                <input
+                    type="file"
+                    id="inputMidiaCard"
+                    onchange="carregarArquivoTradicional(this)"
+                    class="input-file-culto"
+                    accept="image/*,video/*"
+                >
+            </div>
+
+            <button
+                class="btn-enviar-card"
+                id="btnEnviarCard"
+                type="button"
+                onclick="adicionarCard()"
+            >
+                Publicar card ↵
+            </button>
+
+        </div>
+
+        <!-- Feed -->
+        <div id="feed-timeline"></div>
+
+    </div>
+
+    <footer class="footer-Planora">
+    <span class="ponto"></span><strong>Planora</strong><span>© 2026</span>
+    <span id="status-nuvem" class="status-nuvem" role="img" aria-label="Status da nuvem"></span>
+    <span id="email-usuario" class="email-usuario"></span>
+    <button type="button" class="btn-rodape" onclick="sairDaConta()">Sair</button>
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/db.js?v=20261026-1"></script>
+<script type="text/plain" id="app-script">
+        /* =========================================================
+           CONFIGURAÇÃO DO PROJETO
+        ========================================================= */
+
+        const parametrosDaURL =
+            new URLSearchParams(window.location.search);
+
+        const projetoId =
+            parametrosDaURL.get('id');
+
+        let db =
+            lerBancoDeDados();
+
+        let projetoAtual =
+            db[projetoId];
+
+        if (!projetoAtual) {
+            window.location.href = 'index.html';
+        }
+
+        let midiaTemporariaNovo = {
+            blob: null,
+            tipo: null,
+            urlPreview: null
+        };
+
+
+        /* =========================================================
+           RENDERIZAR TIMELINE
+        ========================================================= */
+
+        /* Minimizar/expandir cards: botão "−" (expandido) vira "□" (minimizado). */
+        const ICONE_MENOS = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg>';
+        const ICONE_QUADRADO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>';
+
+        function aplicarMinimizacao(box, minimizado, animar) {
+            const conteudo = box.querySelector('[id^="card-conteudo-"]');
+            box.classList.toggle('minimizado', minimizado);
+            if (conteudo) {
+                if (minimizado) {
+                    const d = conteudo.getAttribute('ondblclick');
+                    if (d) { conteudo.dataset.dbl = d; conteudo.removeAttribute('ondblclick'); }
+                    conteudo.style.cursor = 'default';
+                    conteudo.removeAttribute('title');
+                } else if (conteudo.dataset.dbl) {
+                    conteudo.setAttribute('ondblclick', conteudo.dataset.dbl);
+                    conteudo.style.cursor = 'pointer';
+                    conteudo.title = 'Duplo clique para editar';
+                }
+            }
+            const b = box.querySelector('.btn-min-card');
+            if (b) {
+                b.innerHTML = minimizado ? ICONE_QUADRADO : ICONE_MENOS;
+                b.title = minimizado ? 'Expandir card' : 'Minimizar card';
+                b.setAttribute('aria-label', b.title);
+                b.setAttribute('aria-expanded', String(!minimizado));
+            }
+            if (animar) { box.classList.remove('anim-min'); void box.offsetWidth; box.classList.add('anim-min'); }
+        }
+
+        function sincronizarMinimizar() {
+            document.querySelectorAll('#feed-timeline .timeline-item').forEach(item => {
+                const box = item.querySelector('.timeline-card');
+                if (!box) return;
+                const card = projetoAtual.cards[Number(box.id.replace('card-box-', ''))];
+                const b = box.querySelector('.btn-min-card');
+                if (!card || !b) return;
+                b.onclick = () => {
+                    if (box.querySelector('.btn-enviar-card')) return;   // card em edição
+                    const novo = !box.classList.contains('minimizado');
+                    card.minimizado = novo;
+                    db[projetoId] = projetoAtual;
+                    salvarBancoDeDados(db);
+                    aplicarMinimizacao(box, novo, true);
+                };
+                aplicarMinimizacao(box, !!card.minimizado, false);
+            });
+        }
+
+        /* Lápis: se o card estiver minimizado, expande e abre a edição. */
+        function editarCardPeloLapis(index) {
+            const box = document.getElementById(`card-box-${index}`);
+            if (!box || box.querySelector('.btn-enviar-card')) return;
+            if (box.classList.contains('minimizado')) {
+                projetoAtual.cards[index].minimizado = false;
+                db[projetoId] = projetoAtual;
+                salvarBancoDeDados(db);
+                aplicarMinimizacao(box, false, false);
+            }
+            ativarEdicaoCard(index);
+        }
+
+        /* Formulário de novo card: abre pelo botão "+" ao lado do primeiro card.
+           Em projetos sem cards ele fica sempre aberto. */
+        let formularioAberto = false;
+
+        function abrirFecharFormulario(abrir, focar) {
+            const form = document.getElementById('form-novo-card');
+            formularioAberto = abrir;
+            if (abrir) {
+                form.hidden = false;
+                form.classList.remove('fechando', 'entrando');
+                void form.offsetWidth;
+                form.classList.add('entrando');
+                if (focar) setTimeout(() => document.getElementById('inputTituloCard').focus(), 120);
+            } else {
+                form.classList.remove('entrando');
+                form.classList.add('fechando');
+                setTimeout(() => {
+                    if (!formularioAberto) { form.hidden = true; form.classList.remove('fechando'); }
+                }, 220);
+            }
+            const b = document.querySelector('.btn-mais-card');
+            const primeiro = document.querySelector('#feed-timeline .timeline-item');
+            const destino = abrir ? form : primeiro;
+            if (b && destino) {
+                destino.appendChild(b);
+                b.classList.toggle('aberto', abrir);
+                b.title = abrir ? 'Fechar novo card' : 'Novo card';
+                b.setAttribute('aria-label', b.title);
+                b.setAttribute('aria-expanded', String(abrir));
+            }
+        }
+
+        function sincronizarFormulario() {
+            const form = document.getElementById('form-novo-card');
+            const primeiro = document.querySelector('#feed-timeline .timeline-item');
+            if (!primeiro) {                       // sem cards: formulário sempre visível
+                formularioAberto = true;
+                form.hidden = false;
+                form.classList.remove('fechando', 'entrando');
+                return;
+            }
+            if (!form.classList.contains('fechando')) form.hidden = !formularioAberto;
+            let b = document.querySelector('.btn-mais-card');
+            if (!b) {
+                b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'btn-mais-card';
+                b.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>';
+                b.onclick = () => abrirFecharFormulario(!formularioAberto, true);
+            }
+            b.classList.toggle('aberto', formularioAberto);
+            b.title = formularioAberto ? 'Fechar novo card' : 'Novo card';
+            b.setAttribute('aria-label', b.title);
+            b.setAttribute('aria-expanded', String(formularioAberto));
+            (formularioAberto ? form : primeiro).appendChild(b);
+        }
+
+        /* Campos de legenda crescem junto com o texto (Enter pula linha). */
+        function ajustarAlturaTextarea(campo) {
+            if (!campo) return;
+            campo.style.height = 'auto';
+            campo.style.height = campo.scrollHeight + 2 + 'px';
+        }
+        function ajustarTodasLegendas() {
+            document.querySelectorAll('textarea.input-legenda-card').forEach(ajustarAlturaTextarea);
+        }
+        document.addEventListener('input', e => {
+            if (e.target.matches && e.target.matches('textarea.input-legenda-card')) ajustarAlturaTextarea(e.target);
+        });
+        document.addEventListener('focusin', e => {
+            if (e.target.matches && e.target.matches('textarea.input-legenda-card')) ajustarAlturaTextarea(e.target);
+        });
+        window.addEventListener('resize', ajustarTodasLegendas);
+
+        function escaparHTML(texto) {
+            return String(texto).replace(/[&<>"']/g, c => (
+                { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+            ));
+        }
+
+        /* Legenda: preserva quebras de linha e transforma links em clicáveis (com escape de HTML). */
+        function formatarLegenda(legenda) {
+            const puro = String(legenda || '').replace(/<br\s*\/?>/gi, '\n');
+            return escaparHTML(puro)
+                .replace(/(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi, m => {
+                    let url = m, fim = '';
+                    const sobra = url.match(/[.,;:!?)\]]+$/);
+                    if (sobra) { fim = sobra[0]; url = url.slice(0, -fim.length); }
+                    const href = /^www\./i.test(url) ? 'https://' + url : url;
+                    return `<a href="${href}" target="_blank" rel="noopener noreferrer" ondblclick="event.stopPropagation()">${url}</a>${fim}`;
+                })
+                .replace(/\n/g, '<br>');
+        }
+
+        function formatarPrazoHeader(prazo) {
+            if (!prazo || prazo === '---') return '';
+            const m = String(prazo).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            return m ? `${m[3]}/${m[2]}/${m[1]}` : prazo;
+        }
+
+        /* ---------- Editar os dados do projeto (título, rótulo, área, prazo e tags) na própria página ---------- */
+        const ROTULOS_ORDEM = ['A ser feito', 'Atrasado', 'Esperando', 'Em andamento', 'Pronto'];
+
+        function listaRotulosEdicao() {
+            let nomes = [];
+            try { nomes = ((lerPreferenciasBanco().rotulos || []) || []).map(r => r.nome); } catch (e) { /* padrão */ }
+            ROTULOS_ORDEM.forEach(n => { if (!nomes.includes(n)) nomes.push(n); });
+            return nomes.sort((a, b) => {
+                const i = ROTULOS_ORDEM.indexOf(a), j = ROTULOS_ORDEM.indexOf(b);
+                return (i < 0 ? 99 : i) - (j < 0 ? 99 : j);
+            });
+        }
+        function listaAreasEdicao() {
+            return Planora_Areas.nomes();
+        }
+        function preencherSelect(id, lista, atual) {
+            const itens = atual && !lista.includes(atual) ? [...lista, atual] : lista;
+            document.getElementById(id).innerHTML = itens
+                .map(v => `<option${v === atual ? ' selected' : ''}>${escaparHTML(v)}</option>`).join('');
+        }
+        function abrirEdicaoDados() {
+            document.getElementById('ed-nome').value = projetoAtual.nome || '';
+            preencherSelect('ed-rotulo', listaRotulosEdicao(), projetoAtual.rotulo || projetoAtual.status || 'Em andamento');
+            preencherSelect('ed-area', listaAreasEdicao(), projetoAtual.area || Planora_Areas.padrao());
+            const prazo = projetoAtual.prazo || '';
+            document.getElementById('ed-prazo').value = /^\d{4}-\d{2}-\d{2}$/.test(prazo) ? prazo : '';
+            document.getElementById('painel-edicao').hidden = false;
+            document.getElementById('ed-nome').focus();
+        }
+        function fecharEdicaoDados() {
+            document.getElementById('painel-edicao').hidden = true;
+        }
+        function salvarEdicaoDados() {
+            const nome = document.getElementById('ed-nome').value.trim();
+            if (!nome) { alert('O título não pode ficar vazio.'); return; }
+            const rotulo = document.getElementById('ed-rotulo').value;
+            projetoAtual.nome = nome;
+            projetoAtual.rotulo = rotulo;
+            if ('status' in projetoAtual) projetoAtual.status = rotulo;
+            projetoAtual.area = document.getElementById('ed-area').value;
+            projetoAtual.prazo = document.getElementById('ed-prazo').value || '---';
+            db[projetoId] = projetoAtual;
+            salvarBancoDeDados(db);
+            if (typeof enviarAgora === 'function') enviarAgora();
+            fecharEdicaoDados();
+            renderizarTimeline();
+        }
+
+        document.getElementById('btn-editar-dados').addEventListener('click', () => {
+            if (document.getElementById('painel-edicao').hidden) abrirEdicaoDados(); else fecharEdicaoDados();
+        });
+        document.getElementById('ed-salvar').addEventListener('click', salvarEdicaoDados);
+        document.getElementById('ed-cancelar').addEventListener('click', fecharEdicaoDados);
+        document.getElementById('painel-edicao').addEventListener('keydown', e => {
+            if (e.key === 'Escape') { fecharEdicaoDados(); return; }
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            salvarEdicaoDados();
+        });
+
+        /* ---------- Tags do projeto: mesmo seletor do menu (escolher existente, criar com cor, remover) ---------- */
+        const CORES_TAG = [
+            '#3b82f6', '#22c55e', '#ef4444', '#f97316', '#eab308', '#a855f7',
+            '#ec4899', '#14b8a6', '#6366f1', '#92400e', '#6b7280'
+        ];
+        let popTags = null;
+
+        function tagsExistentes() {
+            const mapa = new Map();
+            db.forEach(p => (p.tags || []).forEach(tg => {
+                const k = tg.nome.toLowerCase() + '|' + tg.cor;
+                if (!mapa.has(k)) mapa.set(k, { nome: tg.nome, cor: tg.cor });
+            }));
+            return [...mapa.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+        }
+
+        function fecharPopTags() {
+            if (popTags) { popTags.el.remove(); popTags = null; }
+        }
+
+        function abrirPopTags(event) {
+            event.stopPropagation();
+            if (popTags) return fecharPopTags();
+            const el = document.createElement('div');
+            el.className = 'pop-tags';
+            el.setAttribute('role', 'dialog');
+            el.setAttribute('aria-label', 'Tags do projeto');
+            popTags = { el, cor: CORES_TAG[0], livres: [] };
+            document.body.appendChild(el);
+
+            el.addEventListener('click', e => {
+                const b = e.target.closest('[data-acao]');
+                if (!b) return;
+                const acao = b.dataset.acao;
+                if (acao === 'cor') definirCorPop(b.dataset.cor);
+                else if (acao === 'remover') removerTag(Number(b.dataset.i));
+                else if (acao === 'usar') adicionarTag(popTags.livres[Number(b.dataset.i)]);
+                else if (acao === 'criar') criarTag();
+            });
+            el.addEventListener('input', e => {
+                if (e.target.id === 'tag-cor-custom') definirCorPop(e.target.value);
+            });
+            el.addEventListener('keydown', e => {
+                if (e.key === 'Enter' && e.target.id === 'tag-nome') { e.preventDefault(); criarTag(); }
+            });
+
+            desenharPopTags();
+            posicionarPopTags();
+            const campo = el.querySelector('#tag-nome');
+            if (campo) campo.focus();
+        }
+
+        function desenharPopTags() {
+            const atuais = projetoAtual.tags || [];
+            const livres = tagsExistentes().filter(tg => !atuais.some(a => a.nome.toLowerCase() === tg.nome.toLowerCase()));
+            popTags.livres = livres;
+            const estilo = c => `background:${c.cor};color:${corTextoTag(c.cor)}`;
+            popTags.el.innerHTML = `
+                ${atuais.length ? `<div class="pop-sec"><div class="pop-tit">Neste item</div><div class="pop-chips">
+                    ${atuais.map((tg, i) => `<span class="tag-bolha tag-removivel" style="${estilo(tg)}">${escaparHTML(tg.nome)}<button type="button" data-acao="remover" data-i="${i}" aria-label="Remover tag ${escaparHTML(tg.nome)}">×</button></span>`).join('')}
+                </div></div>` : ''}
+                ${livres.length ? `<div class="pop-sec"><div class="pop-tit">Tags existentes</div><div class="pop-chips">
+                    ${livres.map((tg, i) => `<button type="button" class="tag-bolha tag-escolher" data-acao="usar" data-i="${i}" style="${estilo(tg)}">${escaparHTML(tg.nome)}</button>`).join('')}
+                </div></div>` : ''}
+                <div class="pop-sec"><div class="pop-tit">Nova tag</div>
+                    <input id="tag-nome" class="pop-input" maxlength="24" placeholder="Nome da tag" autocomplete="off">
+                    <div class="pop-cores">
+                        ${CORES_TAG.map(c => `<button type="button" class="cor-opcao${c === popTags.cor ? ' sel' : ''}" data-acao="cor" data-cor="${c}" style="background:${c}" aria-label="Cor ${c}"></button>`).join('')}
+                        <label class="cor-opcao cor-custom${CORES_TAG.includes(popTags.cor) ? '' : ' sel'}" title="Outra cor"><input type="color" id="tag-cor-custom" value="${popTags.cor}"></label>
+                    </div>
+                    <button type="button" class="btn-salvar-inline pop-criar" data-acao="criar">Adicionar</button>
+                </div>`;
+        }
+
+        function definirCorPop(cor) {
+            popTags.cor = cor;
+            popTags.el.querySelectorAll('.cor-opcao').forEach(b => b.classList.remove('sel'));
+            const pre = popTags.el.querySelector(`.cor-opcao[data-cor="${cor}"]`);
+            (pre || popTags.el.querySelector('.cor-custom')).classList.add('sel');
+        }
+
+        function posicionarPopTags() {
+            const btn = document.getElementById('btn-tag-mais');
+            if (!btn || !popTags) return;
+            const r = btn.getBoundingClientRect(), el = popTags.el;
+            el.style.maxHeight = (window.innerHeight - 16) + 'px';
+            const w = el.offsetWidth, h = el.offsetHeight;
+            const left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
+            let top = r.bottom + 6;
+            if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - 6 - h);
+            el.style.left = left + 'px';
+            el.style.top = top + 'px';
+        }
+
+        function atualizarAposTag() {
+            db[projetoId] = projetoAtual;
+            salvarBancoDeDados(db);
+            if (typeof enviarAgora === 'function') enviarAgora();
+            document.getElementById('header-tags').innerHTML = (projetoAtual.tags || []).map(htmlTagBolha).join('');
+            desenharPopTags();
+            posicionarPopTags();
+        }
+
+        function adicionarTag(tag) {
+            if (!tag) return;
+            projetoAtual.tags = projetoAtual.tags || [];
+            if (projetoAtual.tags.some(x => x.nome.toLowerCase() === tag.nome.toLowerCase())) return;
+            projetoAtual.tags.push({ nome: tag.nome, cor: tag.cor });
+            atualizarAposTag();
+        }
+
+        function criarTag() {
+            const campo = popTags.el.querySelector('#tag-nome');
+            const nome = campo.value.trim().slice(0, 24);
+            if (!nome) { campo.focus(); return; }
+            adicionarTag({ nome, cor: popTags.cor });
+            const novo = popTags.el.querySelector('#tag-nome');
+            if (novo) novo.focus();
+        }
+
+        function removerTag(i) {
+            (projetoAtual.tags || []).splice(i, 1);
+            atualizarAposTag();
+        }
+
+        document.getElementById('btn-tag-mais').addEventListener('click', abrirPopTags);
+        document.addEventListener('pointerdown', e => {
+            if (popTags && !popTags.el.contains(e.target) && !e.target.closest('#btn-tag-mais')) fecharPopTags();
+        }, true);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharPopTags(); });
+        window.addEventListener('resize', () => { if (popTags) posicionarPopTags(); });
+        window.addEventListener('scroll', () => { if (popTags) posicionarPopTags(); }, true);
+
+        async function renderizarTimeline() {
+
+            document.getElementById('header-titulo').innerText =
+                projetoAtual.nome;
+
+            const statusHeader =
+                document.getElementById('header-status');
+
+            const rotuloHeader =
+                projetoAtual.status ||
+                projetoAtual.rotulo ||
+                'Em andamento';
+
+            statusHeader.innerText = rotuloHeader;
+
+            document.getElementById('header-tags').innerHTML =
+
+                (projetoAtual.tags || []).map(htmlTagBolha).join('');
+
+            const nomeArea = projetoAtual.area || Planora_Areas.padrao();
+            const elArea = document.getElementById('header-area');
+            elArea.textContent = nomeArea;
+            elArea.style.cssText = Planora_Areas.estilo(nomeArea);
+            const prazoHeader = formatarPrazoHeader(projetoAtual.prazo);
+            const elPrazo = document.getElementById('header-prazo');
+            elPrazo.hidden = !prazoHeader;
+            elPrazo.textContent = prazoHeader ? 'Prazo: ' + prazoHeader : '';
+
+            /*
+             * Usa exatamente a mesma cor do rótulo
+             * utilizado na tabela/menu do Planora.
+             */
+            const opcoesRotulos =
+                (lerPreferenciasBanco().rotulos || [
+                    { nome: 'Em andamento', cor: 'blue' },
+                    { nome: 'Pronto', cor: 'green' },
+                    { nome: 'Esperando', cor: '#a855f7' },
+                    { nome: 'Atrasado', cor: 'red' },
+                    { nome: 'A ser feito', cor: 'gray' }
+                ]);
+
+            const rotuloEncontrado =
+                opcoesRotulos.find(
+                    item => item.nome === rotuloHeader
+                );
+
+            const MAPA_CORES = {blue:'#0ea5e9',green:'#10b981',red:'#dc2626',gray:'#4b5563',purple:'#a855f7'};
+            const corBruta = rotuloEncontrado ? rotuloEncontrado.cor : 'blue';
+            statusHeader.style.setProperty('--glow', MAPA_CORES[corBruta] || corBruta);
+
+            const feed =
+                document.getElementById('feed-timeline');
+
+            feed.innerHTML = '';
+
+            if (!projetoAtual.cards) {
+                projetoAtual.cards = [];
+            }
+
+            [...projetoAtual.cards]
+                .reverse()
+                .forEach((card, indexRealInvertido) => {
+
+                    const indexReal =
+                        projetoAtual.cards.length -
+                        1 -
+                        indexRealInvertido;
+
+                    const dataExibicao =
+                        card.data ||
+                        'Data não registada';
+
+                    const itemDiv =
+                        document.createElement('div');
+
+                    itemDiv.className =
+                        'timeline-item';
+
+                    itemDiv.innerHTML = `
+                        <span class="timeline-date">
+                            ${card.data || 'Data não registada'}
+                        </span>
+
+                        <div
+                            class="timeline-card"
+                            id="card-box-${indexReal}"
+                        >
+                            <button
+                                class="btn-semaforo ${card.semaforo || 'verde'}"
+                                id="semaforo-${indexReal}"
+                                onclick="alternarSemaforo(${indexReal})"
+                                title="Status do card: ${card.semaforo || 'verde'} (clique para mudar)"
+                                type="button"
+                            ></button>
+
+                            <div class="card-controles">
+                                <button
+                                    class="btn-ctrl btn-editar-card"
+                                    onclick="editarCardPeloLapis(${indexReal})"
+                                    title="Editar card"
+                                    aria-label="Editar card"
+                                    type="button"
+                                >
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+                                </button>
+                                <button
+                                    class="btn-ctrl btn-min-card"
+                                    type="button"
+                                    aria-label="Minimizar card"
+                                ></button>
+                                <button
+                                    class="btn-ctrl btn-fechar-card"
+                                    onclick="deletarCard(${indexReal})"
+                                    title="Excluir card"
+                                    aria-label="Excluir card"
+                                    type="button"
+                                >
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14"></path><path d="M19 5L5 19"></path></svg>
+                                </button>
+                            </div>
+
+                            <div
+                                id="card-conteudo-${indexReal}"
+                                ondblclick="ativarEdicaoCard(${indexReal})"
+                                style="cursor: pointer;"
+                                title="Duplo clique para editar"
+                            >
+                                <span class="card-tipo-tag">
+                                    ${card.tipo || 'Atualização'}
+                                </span>
+
+                                <h3>${card.titulo || ''}</h3>
+
+                                <p class="legenda-card">${formatarLegenda(card.legenda)}</p>
+
+                                <div
+                                    class="card-midia-container"
+                                    id="midia-card-${indexReal}"
+                                ></div>
+                            </div>
+                            <div class="card-notas" id="notas-${indexReal}"></div>
+
+                        </div>
+                    `;
+
+                    feed.appendChild(itemDiv);
+
+                    renderizarNotas(indexReal);
+                    carregarMidiaDoCard(card, indexReal);
+                });
+        }
+
+
+        /* =========================================================
+           SEMÁFORO DO CARD (verde → vermelho → amarelo) E NOTAS
+        ========================================================= */
+        const ORDEM_SEMAFORO = ['verde', 'vermelho', 'amarelo', 'cinza'];
+
+        function escaparHTML(texto) {
+            return String(texto).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function alternarSemaforo(index) {
+            const card = projetoAtual.cards[index];
+            const atual = card.semaforo || 'verde';
+            card.semaforo = ORDEM_SEMAFORO[(ORDEM_SEMAFORO.indexOf(atual) + 1) % ORDEM_SEMAFORO.length];
+            db[projetoId] = projetoAtual;
+            salvarBancoDeDados(db);
+            const bola = document.getElementById(`semaforo-${index}`);
+            bola.className = `btn-semaforo ${card.semaforo} pulo`;
+            bola.title = `Status do card: ${card.semaforo} (clique para mudar)`;
+            setTimeout(() => bola.classList.remove('pulo'), 350);
+        }
+
+        function renderizarNotas(index) {
+            const area = document.getElementById(`notas-${index}`);
+            if (!area) return;
+            const notas = projetoAtual.cards[index].notas || [];
+            const itens = notas.map((n, i) => `
+                <div class="nota-item">
+                    <span class="nota-avatar">EU</span>
+                    <div class="nota-corpo">
+                        <div class="nota-meta">
+                            <span>${escaparHTML(n.data || '')}</span>
+                            <button type="button" class="nota-apagar" title="Apagar nota" onclick="apagarNota(${index}, ${i})">×</button>
+                        </div>
+                        <p class="legenda-card">${formatarLegenda(n.texto)}</p>
+                    </div>
+                </div>`).join('');
+            area.innerHTML = `
+                <div class="notas-topo"><strong>Minhas notas</strong>${notas.length ? `<span>${notas.length}</span>` : ''}</div>
+                ${itens ? `<div class="notas-lista">${itens}</div>` : ''}
+                <div class="nota-nova">
+                    <input type="text" id="nota-input-${index}" placeholder="Adicionar uma nota pessoal a este card..."
+                        onkeydown="if (event.key === 'Enter') salvarNota(${index})">
+                    <button type="button" onclick="salvarNota(${index})">Salvar</button>
+                </div>`;
+        }
+
+        function salvarNota(index) {
+            const campo = document.getElementById(`nota-input-${index}`);
+            const texto = campo.value.trim();
+            if (!texto) return;
+            const card = projetoAtual.cards[index];
+            const agora = new Date();
+            (card.notas = card.notas || []).push({
+                texto,
+                data: `${agora.toLocaleDateString('pt-BR')} às ${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+            });
+            db[projetoId] = projetoAtual;
+            salvarBancoDeDados(db);
+            renderizarNotas(index);
+            document.getElementById(`nota-input-${index}`).focus();
+        }
+
+        function apagarNota(index, notaIndex) {
+            if (!confirm('Apagar esta nota?')) return;
+            projetoAtual.cards[index].notas.splice(notaIndex, 1);
+            db[projetoId] = projetoAtual;
+            salvarBancoDeDados(db);
+            renderizarNotas(index);
+        }
+
+        /* =========================================================
+           CARREGAR MÍDIA DO CARD
+        ========================================================= */
+
+        async function carregarMidiaDoCard(card, index) {
+
+            const container =
+                document.getElementById(
+                    `midia-card-${index}`
+                );
+
+            if (!container) return;
+
+            /*
+             * Cards antigos podem ainda possuir:
+             * card.midia = "data:image/..."
+             *
+             * Mantemos compatibilidade com eles.
+             */
+            if (card.midia) {
+
+                if (
+                    card.tipoMidia &&
+                    card.tipoMidia.startsWith('video')
+                ) {
+
+                    container.innerHTML = `
+                        <video
+                            controls
+                            src="${card.midia}"
+                        ></video>
+                    `;
+
+                } else {
+
+                    container.innerHTML = `
+                        <img
+                            src="${card.midia}"
+                            alt="Anexo"
+                        >
+                    `;
+                }
+
+                return;
+            }
+
+            /*
+             * Cards novos usam IndexedDB.
+             */
+            if (!card.midiaId) return;
+
+            try {
+
+                const registro =
+                    await obterMidiaBlob(card.midiaId);
+
+                if (!registro || !registro.blob) return;
+
+                const url =
+                    URL.createObjectURL(registro.blob);
+
+                if (
+                    registro.tipo &&
+                    registro.tipo.startsWith('video')
+                ) {
+
+                    container.innerHTML = `
+                        <video
+                            controls
+                            src="${url}"
+                        ></video>
+                    `;
+
+                } else {
+
+                    container.innerHTML = `
+                        <img
+                            src="${url}"
+                            alt="Anexo"
+                        >
+                    `;
+                }
+
+            } catch (erro) {
+
+                console.error(
+                    'Erro ao carregar mídia:',
+                    erro
+                );
+            }
+        }
+
+
+        /* =========================================================
+           CAPTURAR COLAGEM
+        ========================================================= */
+
+        function capturarCole(event) {
+
+            const clipboard =
+                event.clipboardData ||
+                window.clipboardData;
+
+            if (!clipboard || !clipboard.items) return;
+
+            const items =
+                clipboard.items;
+
+            for (const item of items) {
+
+                if (
+                    item.type.indexOf('image') === 0 ||
+                    item.type.indexOf('video') === 0
+                ) {
+
+                    event.preventDefault();
+
+                    const blob =
+                        item.getAsFile();
+
+                    if (!blob) return;
+
+                    prepararMidiaNovo(blob);
+
+                    return;
+                }
+            }
+        }
+
+
+        /* =========================================================
+           ARQUIVO TRADICIONAL
+        ========================================================= */
+
+        function carregarArquivoTradicional(input) {
+
+            if (
+                input.files &&
+                input.files[0]
+            ) {
+
+                prepararMidiaNovo(
+                    input.files[0]
+                );
+            }
+        }
+
+
+        /* =========================================================
+           PREPARAR MÍDIA
+        ========================================================= */
+
+        function prepararMidiaNovo(blob) {
+
+            removerUrlPreviewNovo();
+
+            midiaTemporariaNovo = {
+                blob: blob,
+                tipo: blob.type,
+                urlPreview: URL.createObjectURL(blob)
+            };
+
+            atualizarPreviewNovo();
+        }
+
+
+        function removerUrlPreviewNovo() {
+
+            if (
+                midiaTemporariaNovo &&
+                midiaTemporariaNovo.urlPreview
+            ) {
+
+                URL.revokeObjectURL(
+                    midiaTemporariaNovo.urlPreview
+                );
+            }
+        }
+
+
+        /* =========================================================
+           PREVIEW NOVO CARD
+        ========================================================= */
+
+        function atualizarPreviewNovo() {
+
+            const container =
+                document.getElementById(
+                    'container-preview-novo'
+                );
+
+            if (
+                !midiaTemporariaNovo ||
+                !midiaTemporariaNovo.blob
+            ) {
+
+                container.innerHTML = '';
+
+                return;
+            }
+
+            const url =
+                midiaTemporariaNovo.urlPreview;
+
+            if (
+                midiaTemporariaNovo.tipo &&
+                midiaTemporariaNovo.tipo.startsWith('video')
+            ) {
+
+                container.innerHTML = `
+                    <div class="preview-midia-wrapper">
+
+                        <video
+                            src="${url}"
+                            controls
+                        ></video>
+
+                        <button
+                            class="btn-remover-preview"
+                            onclick="removerMidiaNovo()"
+                            title="Remover mídia"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
+                    </div>
+                `;
+
+            } else {
+
+                container.innerHTML = `
+                    <div class="preview-midia-wrapper">
+
+                        <img
+                            src="${url}"
+                            alt="Preview"
+                        >
+
+                        <button
+                            class="btn-remover-preview"
+                            onclick="removerMidiaNovo()"
+                            title="Remover mídia"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
+                    </div>
+                `;
+            }
+        }
+
+
+        /* =========================================================
+           REMOVER MÍDIA NOVO CARD
+        ========================================================= */
+
+        function removerMidiaNovo() {
+
+            removerUrlPreviewNovo();
+
+            midiaTemporariaNovo = {
+                blob: null,
+                tipo: null,
+                urlPreview: null
+            };
+
+            const input =
+                document.getElementById(
+                    'inputMidiaCard'
+                );
+
+            if (input) {
+                input.value = '';
+            }
+
+            atualizarPreviewNovo();
+        }
+
+
+        /* =========================================================
+           ENVIAR NOVO CARD
+        ========================================================= */
+
+        async function adicionarCard() {
+
+            const titulo =
+                document.getElementById(
+                    'inputTituloCard'
+                ).value.trim();
+
+            const legenda =
+                document.getElementById(
+                    'inputLegendaCard'
+                ).value;
+
+            const tipo =
+                document.getElementById(
+                    'inputTipoCard'
+                ).value;
+
+            const botao =
+                document.getElementById(
+                    'btnEnviarCard'
+                );
+
+            if (!titulo) {
+
+                alert(
+                    'O card precisa de um título.'
+                );
+
+                document.getElementById(
+                    'inputTituloCard'
+                ).focus();
+
+                return;
+            }
+
+            botao.disabled = true;
+            botao.textContent = '...';
+
+            try {
+
+                let midiaId = null;
+
+                /*
+                 * AQUI ESTÁ A CORREÇÃO:
+                 * a imagem/vídeo vai para IndexedDB,
+                 * e não para localStorage.
+                 */
+                if (
+                    midiaTemporariaNovo &&
+                    midiaTemporariaNovo.blob
+                ) {
+
+                    midiaId =
+                        await salvarMidiaBlob(
+                            midiaTemporariaNovo.blob,
+                            midiaTemporariaNovo.tipo
+                        );
+                }
+
+                const agora =
+                    new Date();
+
+                const dataString =
+                    `${agora.toLocaleDateString('pt-BR')} às ${
+                        agora.toLocaleTimeString(
+                            'pt-BR',
+                            {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }
+                        )
+                    }`;
+
+                const novoCard = {
+
+                    tipo: tipo,
+
+                    titulo: titulo,
+
+                    legenda:
+                        legenda.replace(
+                            /\n/g,
+                            '<br>'
+                        ),
+
+                    data: dataString,
+
+                    /*
+                     * Mantido como null para os cards novos.
+                     * A mídia fica em IndexedDB.
+                     */
+                    midia: null,
+
+                    tipoMidia:
+                        midiaTemporariaNovo.tipo ||
+                        null,
+
+                    midiaId: midiaId
+                };
+
+                projetoAtual.cards.push(
+                    novoCard
+                );
+
+                db[projetoId] =
+                    projetoAtual;
+
+                salvarBancoDeDados(db);
+
+                limparFormularioNovoCard();
+
+                abrirFecharFormulario(false);
+
+                await renderizarTimeline();
+
+            } catch (erro) {
+
+                console.error(
+                    'Erro ao criar card:',
+                    erro
+                );
+
+                alert(
+                    'Não foi possível criar o card.\n\n' +
+                    'Erro: ' +
+                    (erro.message || erro)
+                );
+
+            } finally {
+
+                botao.disabled = false;
+                botao.textContent = 'Publicar card ↵';
+            }
+        }
+
+
+        /* =========================================================
+           LIMPAR FORMULÁRIO
+        ========================================================= */
+
+        function limparFormularioNovoCard() {
+
+            document.getElementById(
+                'inputTituloCard'
+            ).value = '';
+
+            document.getElementById(
+                'inputLegendaCard'
+            ).value = '';
+
+            removerMidiaNovo();
+
+            document.getElementById(
+                'inputTituloCard'
+            ).focus();
+        }
+
+
+        /* =========================================================
+           ENTER PARA ENVIAR
+           SHIFT + ENTER = NOVA LINHA
+        ========================================================= */
+
+        document.addEventListener(
+            'keydown',
+            function(event) {
+
+                const campo =
+                    event.target;
+
+                if (
+                    event.key === 'Enter' &&
+                    (
+                        (campo.id === 'inputTituloCard' && !event.shiftKey) ||
+                        (campo.id === 'inputLegendaCard' && (event.ctrlKey || event.metaKey))
+                    )
+                ) {
+
+                    event.preventDefault();
+
+                    adicionarCard();
+
+                    return;
+                }
+
+                if (
+                    event.key === 'Enter' &&
+                    (
+                        (campo.id.startsWith('edit-titulo-') && !event.shiftKey) ||
+                        (campo.id.startsWith('edit-legenda-') && (event.ctrlKey || event.metaKey))
+                    )
+                ) {
+
+                    event.preventDefault();
+
+                    const index =
+                        parseInt(
+                            campo.id.split('-').pop(),
+                            10
+                        );
+
+                    salvarEdicaoCard(index);
+                }
+            }
+        );
+
+
+        /* =========================================================
+           MENU DO CARD
+        ========================================================= */
+
+        function alternarMenuCard(event, index) {
+
+            event.stopPropagation();
+
+            document
+                .querySelectorAll(
+                    '.menu-card-flutuante'
+                )
+                .forEach((menu, idx) => {
+
+                    if (idx !== index) {
+                        menu.style.display = 'none';
+                    }
+                });
+
+            const menu =
+                document.getElementById(
+                    `menu-card-${index}`
+                );
+
+            menu.style.display =
+                menu.style.display === 'block'
+                    ? 'none'
+                    : 'block';
+        }
+
+
+        window.onclick = function() {
+
+            document
+                .querySelectorAll(
+                    '.menu-card-flutuante'
+                )
+                .forEach(menu => {
+
+                    menu.style.display = 'none';
+
+                });
+        };
+
+
+        /* =========================================================
+           DELETAR CARD
+        ========================================================= */
+
+        async function deletarCard(index) {
+
+            if (
+                !confirm(
+                    'Tem certeza que deseja apagar este card?'
+                )
+            ) {
+                return;
+            }
+
+            const card =
+                projetoAtual.cards[index];
+
+            /*
+             * Apaga a mídia correspondente
+             * do IndexedDB antes de remover o card.
+             */
+            if (card && card.midiaId) {
+
+                try {
+                    await deletarMidiaBlob(
+                        card.midiaId
+                    );
+                } catch (erro) {
+                    console.error(
+                        'Erro ao apagar mídia:',
+                        erro
+                    );
+                }
+            }
+
+            projetoAtual.cards.splice(
+                index,
+                1
+            );
+
+            db[projetoId] =
+                projetoAtual;
+
+            salvarBancoDeDados(db);
+
+            await renderizarTimeline();
+        }
+
+
+        /* =========================================================
+           EDIÇÃO DO CARD
+        ========================================================= */
+
+        async function ativarEdicaoCard(index) {
+
+            const btnOpcoes =
+                document.getElementById(
+                    `btn-opcoes-${index}`
+                );
+
+            if (btnOpcoes) {
+                btnOpcoes.style.display = 'none';
+            }
+
+            const menu =
+                document.getElementById(
+                    `menu-card-${index}`
+                );
+
+            if (menu) {
+                menu.style.display = 'none';
+            }
+
+            const card =
+                projetoAtual.cards[index];
+
+            const containerConteudo =
+                document.getElementById(
+                    `card-conteudo-${index}`
+                );
+
+            if (!containerConteudo) return;
+
+            const legendaPura =
+                card.legenda
+                    ? card.legenda.replace(
+                        /<br\s*[\/]?>/gi,
+                        '\n'
+                    )
+                    : '';
+
+            window[
+                `midiaTemporariaEdicao_${index}`
+            ] = {
+                blob: null,
+                tipo: card.tipoMidia || null,
+                midiaId: card.midiaId || null,
+                urlPreview: null,
+                removida: false
+            };
+
+            let previewInicialHTML = '';
+
+            /*
+             * Card antigo com Base64.
+             */
+            if (card.midia) {
+
+                const tag =
+                    card.tipoMidia &&
+                    card.tipoMidia.startsWith('video')
+                        ? 'video'
+                        : 'img';
+
+                previewInicialHTML = `
+                    <div class="preview-midia-wrapper">
+
+                        <${tag}
+                            src="${card.midia}"
+                            ${tag === 'video' ? 'controls' : ''}
+                        ></${tag}>
+
+                        <button
+                            class="btn-remover-preview"
+                            onclick="removerMidiaEdicao(${index})"
+                            title="Remover mídia"
+                            type="button"
+                        >
+                            ×
+                        </button>
+
+                    </div>
+                `;
+            }
+
+            /*
+             * Card novo com IndexedDB.
+             */
+            else if (card.midiaId) {
+
+                const registro =
+                    await obterMidiaBlob(
+                        card.midiaId
+                    );
+
+                if (
+                    registro &&
+                    registro.blob
+                ) {
+
+                    const url =
+                        URL.createObjectURL(
+                            registro.blob
+                        );
+
+                    window[
+                        `midiaTemporariaEdicao_${index}`
+                    ].blob =
+                        registro.blob;
+
+                    window[
+                        `midiaTemporariaEdicao_${index}`
+                    ].urlPreview =
+                        url;
+
+                    const tag =
+                        registro.tipo &&
+                        registro.tipo.startsWith('video')
+                            ? 'video'
+                            : 'img';
+
+                    previewInicialHTML = `
+                        <div class="preview-midia-wrapper">
+
+                            <${tag}
+                                src="${url}"
+                                ${tag === 'video' ? 'controls' : ''}
+                            ></${tag}>
+
+                            <button
+                                class="btn-remover-preview"
+                                onclick="removerMidiaEdicao(${index})"
+                                title="Remover mídia"
+                                type="button"
+                            >
+                                ×
+                            </button>
+
+                        </div>
+                    `;
+                }
+            }
+
+            containerConteudo.style.cursor = 'default';
+            containerConteudo.removeAttribute('ondblclick');
+            containerConteudo.removeAttribute('title');
+
+            containerConteudo.innerHTML = `
+
+                <select
+                    id="edit-tipo-${index}"
+                    class="seletor-tipo"
+                    style="margin-bottom: 10px;"
+                >
+                    <option value="Atualização" ${card.tipo === 'Atualização' ? 'selected' : ''}>Atualização</option>
+                    <option value="Tarefa" ${card.tipo === 'Tarefa' ? 'selected' : ''}>Tarefa</option>
+                    <option value="Reunião" ${card.tipo === 'Reunião' ? 'selected' : ''}>Reunião</option>
+                    <option value="Decisão" ${card.tipo === 'Decisão' ? 'selected' : ''}>Decisão</option>
+                </select>
+
+                <input
+                    type="text"
+                    id="edit-titulo-${index}"
+                    class="input-titulo-card"
+                    value="${card.titulo || ''}"
+                    placeholder="Título do card"
+                >
+
+                <textarea
+                    id="edit-legenda-${index}"
+                    class="input-legenda-card"
+                    rows="3"
+                    placeholder="Escreva a legenda ou cole uma imagem/vídeo aqui (Ctrl+V)..."
+                    onpaste="capturarColeEdicao(event, ${index})"
+                >${escaparHTML(legendaPura)}</textarea>
+
+                <div id="container-preview-edicao-${index}">
+                    ${previewInicialHTML}
+                </div>
+
+                <div style="margin-top: 10px;">
+
+                    <label
+                        class="label-file"
+                        for="edit-novo-arquivo-${index}"
+                    >
+                        📁 Inserir Imagem/Vídeo
+                    </label>
+
+                    <input
+                        type="file"
+                        id="edit-novo-arquivo-${index}"
+                        class="input-file-culto"
+                        accept="image/*,video/*"
+                        onchange="carregarArquivoEdicao(this, ${index})"
+                    >
+
+                    <button
+                        class="btn-cancelar-edicao"
+                        onclick="cancelarEdicaoCard(${index})"
+                        type="button"
+                    >
+                        Cancelar edição
+                    </button>
+
+                </div>
+
+                <button
+                    class="btn-enviar-card"
+                    onclick="salvarEdicaoCard(${index})"
+                    type="button"
+                    title="Salvar alterações"
+                >
+                    Salvar ↵
+                </button>
+            `;
+
+            const campoTitulo =
+                document.getElementById(
+                    `edit-titulo-${index}`
+                );
+
+            if (campoTitulo) {
+                campoTitulo.focus();
+                campoTitulo.select();
+            }
+        }
+
+
+        /* =========================================================
+           CANCELAR EDIÇÃO
+        ========================================================= */
+
+        function cancelarEdicaoCard(index) {
+
+            const dados =
+                window[
+                    `midiaTemporariaEdicao_${index}`
+                ];
+
+            if (
+                dados &&
+                dados.urlPreview
+            ) {
+                URL.revokeObjectURL(
+                    dados.urlPreview
+                );
+            }
+
+            delete window[
+                `midiaTemporariaEdicao_${index}`
+            ];
+
+            renderizarTimeline();
+        }
+
+
+        /* =========================================================
+           COLAR MÍDIA NA EDIÇÃO
+        ========================================================= */
+
+        function capturarColeEdicao(event, index) {
+
+            const clipboard =
+                event.clipboardData ||
+                window.clipboardData;
+
+            if (!clipboard || !clipboard.items) return;
+
+            for (const item of clipboard.items) {
+
+                if (
+                    item.type.indexOf('image') === 0 ||
+                    item.type.indexOf('video') === 0
+                ) {
+
+                    event.preventDefault();
+
+                    const blob =
+                        item.getAsFile();
+
+                    if (!blob) return;
+
+                    prepararMidiaEdicao(
+                        index,
+                        blob
+                    );
+
+                    return;
+                }
+            }
+        }
+
+
+        /* =========================================================
+           ARQUIVO NA EDIÇÃO
+        ========================================================= */
+
+        function carregarArquivoEdicao(
+            input,
+            index
+        ) {
+
+            if (
+                input.files &&
+                input.files[0]
+            ) {
+
+                prepararMidiaEdicao(
+                    index,
+                    input.files[0]
+                );
+            }
+        }
+
+
+        async function prepararMidiaEdicao(
+            index,
+            blob
+        ) {
+
+            const anterior =
+                window[
+                    `midiaTemporariaEdicao_${index}`
+                ];
+
+            if (
+                anterior &&
+                anterior.urlPreview
+            ) {
+
+                URL.revokeObjectURL(
+                    anterior.urlPreview
+                );
+            }
+
+            window[
+                `midiaTemporariaEdicao_${index}`
+            ] = {
+
+                blob: blob,
+
+                tipo: blob.type,
+
+                midiaId:
+                    anterior
+                        ? anterior.midiaId
+                        : null,
+
+                urlPreview:
+                    URL.createObjectURL(blob),
+
+                removida: false
+            };
+
+            atualizarPreviewEdicao(index);
+        }
+
+
+        /* =========================================================
+           PREVIEW DA EDIÇÃO
+        ========================================================= */
+
+        function atualizarPreviewEdicao(index) {
+
+            const container =
+                document.getElementById(
+                    `container-preview-edicao-${index}`
+                );
+
+            const dados =
+                window[
+                    `midiaTemporariaEdicao_${index}`
+                ];
+
+            if (
+                !container ||
+                !dados ||
+                !dados.blob
+            ) {
+
+                if (container) {
+                    container.innerHTML = '';
+                }
+
+                return;
+            }
+
+            const tag =
+                dados.tipo &&
+                dados.tipo.startsWith('video')
+                    ? 'video'
+                    : 'img';
+
+            container.innerHTML = `
+
+                <div class="preview-midia-wrapper">
+
+                    <${tag}
+                        src="${dados.urlPreview}"
+                        ${tag === 'video' ? 'controls' : ''}
+                    ></${tag}>
+
+                    <button
+                        class="btn-remover-preview"
+                        onclick="removerMidiaEdicao(${index})"
+                        title="Remover mídia"
+                        type="button"
+                    >
+                        ×
+                    </button>
+
+                </div>
+            `;
+        }
+
+
+        /* =========================================================
+           REMOVER MÍDIA DA EDIÇÃO
+        ========================================================= */
+
+        function removerMidiaEdicao(index) {
+
+            const dados =
+                window[
+                    `midiaTemporariaEdicao_${index}`
+                ];
+
+            if (
+                dados &&
+                dados.urlPreview
+            ) {
+
+                URL.revokeObjectURL(
+                    dados.urlPreview
+                );
+            }
+
+            window[
+                `midiaTemporariaEdicao_${index}`
+            ] = {
+
+                blob: null,
+
+                tipo: null,
+
+                midiaId:
+                    dados
+                        ? dados.midiaId
+                        : null,
+
+                urlPreview: null,
+
+                removida: true
+            };
+
+            const input =
+                document.getElementById(
+                    `edit-novo-arquivo-${index}`
+                );
+
+            if (input) {
+                input.value = '';
+            }
+
+            atualizarPreviewEdicao(index);
+        }
+
+
+        /* =========================================================
+           SALVAR EDIÇÃO
+        ========================================================= */
+
+        async function salvarEdicaoCard(index) {
+
+            const novoTipo =
+                document.getElementById(
+                    `edit-tipo-${index}`
+                ).value;
+
+            const novoTitulo =
+                document.getElementById(
+                    `edit-titulo-${index}`
+                ).value.trim();
+
+            const novaLegenda =
+                document.getElementById(
+                    `edit-legenda-${index}`
+                ).value;
+
+            if (!novoTitulo) {
+
+                alert(
+                    'O título não pode ficar vazio.'
+                );
+
+                return;
+            }
+
+            const dadosMidia =
+                window[
+                    `midiaTemporariaEdicao_${index}`
+                ] || {
+                    blob: null,
+                    tipo: null,
+                    midiaId: null,
+                    removida: false
+                };
+
+            const card =
+                projetoAtual.cards[index];
+
+            try {
+
+                /*
+                 * Se uma nova mídia foi selecionada,
+                 * salva primeiro a nova no IndexedDB.
+                 */
+                if (
+                    dadosMidia.blob
+                ) {
+
+                    const novaMidiaId =
+                        await salvarMidiaBlob(
+                            dadosMidia.blob,
+                            dadosMidia.tipo
+                        );
+
+                    /*
+                     * Apaga a mídia antiga.
+                     */
+                    if (
+                        card.midiaId &&
+                        card.midiaId !== novaMidiaId
+                    ) {
+
+                        await deletarMidiaBlob(
+                            card.midiaId
+                        );
+                    }
+
+                    card.midia =
+                        null;
+
+                    card.midiaId =
+                        novaMidiaId;
+
+                    card.tipoMidia =
+                        dadosMidia.tipo;
+                }
+
+                /*
+                 * Se o usuário removeu a mídia.
+                 */
+                else if (
+                    dadosMidia.removida
+                ) {
+
+                    if (card.midiaId) {
+
+                        await deletarMidiaBlob(
+                            card.midiaId
+                        );
+                    }
+
+                    card.midia =
+                        null;
+
+                    card.midiaId =
+                        null;
+
+                    card.tipoMidia =
+                        null;
+                }
+
+                card.tipo =
+                    novoTipo;
+
+                card.titulo =
+                    novoTitulo;
+
+                card.legenda =
+                    novaLegenda.replace(
+                        /\n/g,
+                        '<br>'
+                    );
+
+                db[projetoId] =
+                    projetoAtual;
+
+                salvarBancoDeDados(db);
+
+                await renderizarTimeline();
+
+            } catch (erro) {
+
+                console.error(
+                    'Erro ao salvar edição:',
+                    erro
+                );
+
+                alert(
+                    'Não foi possível salvar as alterações.\n\n' +
+                    'Erro: ' +
+                    (erro.message || erro)
+                );
+            }
+        }
+
+
+        /* =========================================================
+           INICIALIZAÇÃO
+        ========================================================= */
+
+        const _renderizarTimelineBase = renderizarTimeline;
+renderizarTimeline = async function () {
+    await _renderizarTimelineBase();
+    if (window.Planora_Topo) {
+        const cadeia = [];
+        let pid = projetoAtual.pai, guarda = 0;
+        while (pid && guarda++ < 50) {
+            const f = db.find(x => x.tipo === 'pasta' && x.id === pid);
+            if (!f) break;
+            cadeia.unshift(f);
+            pid = f.pai;
+        }
+        Planora_Topo.definirCaminho([
+            ...cadeia.map(f => ({ nome: f.nome, pasta: f.id, href: 'index.html?pasta=' + f.id })),
+            { nome: projetoAtual.nome }
+        ]);
+        const voltar = document.querySelector('.btn-voltar');
+        if (voltar && projetoAtual.pai) voltar.href = 'index.html?pasta=' + projetoAtual.pai;
+    }
+    sincronizarFormulario();
+    sincronizarMinimizar();
+    ajustarTodasLegendas();
+};
+
+window.addEventListener('Planora-dados-restaurados', e => {
+    db = e.detail.dados;
+    projetoAtual = db[projetoId];
+    if (!projetoAtual) {
+        window.location.href = 'index.html';
+        return;
+    }
+    renderizarTimeline();
+});
+
+(async function() {
+
+            try {
+                await abrirBancoMidia();
+            } catch (erro) {
+                console.error(
+                    'IndexedDB não pôde ser inicializado:',
+                    erro
+                );
+            }
+
+            renderizarTimeline();
+        })();
+
+    </script>
+<script>
+Planora_PRONTO.then(() => {
+    if (window.Planora_REDIRECIONANDO_WORKSPACES) return;
+    const s = document.createElement('script');
+    s.textContent = document.getElementById('app-script').textContent;
+    document.body.appendChild(s);
+});
+</script>
+</body>
+</html>
