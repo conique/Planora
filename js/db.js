@@ -884,7 +884,7 @@ function telaBoasVindas(lista) {
                 </section>
                 ${vazio ? '' : `<section class="ws-secao ws-secao-lista" aria-labelledby="ws-tit-lista">
                     <div class="ws-secao-topo"><div class="ws-secao-titulo"><h2 id="ws-tit-lista">Entrar em um workspace</h2><span class="ws-contagem">${lista.length}</span></div>
-                        <button class="ws-btn-novo-workspace" id="ws-adicionar" type="button" aria-expanded="false">Novo workspace</button></div>
+                        <button class="ws-btn-novo-workspace" id="ws-adicionar" type="button" aria-expanded="false">+ Novo workspace</button></div>
                     <div class="ws-lista" role="list"></div>
                 </section>`}
             </main>

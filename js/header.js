@@ -40,8 +40,8 @@
             ${simples ? '' : `<div class="topo-mais">
                 <button class="btn-mais-opcoes" id="topo-mais-opcoes" type="button" title="Mais opções" aria-label="Mais opções" aria-haspopup="menu" aria-expanded="false">⋯</button>
                 <div class="menu-mais-opcoes" id="menu-mais-opcoes" role="menu" hidden>
-                    <button type="button" role="menuitem" id="mais-criar-area">Criar nova área</button>
-                    <button type="button" role="menuitem" id="mais-criar-rotulo">Criar novo rótulo</button>
+                    <button type="button" role="menuitem" id="mais-criar-rotulo">Criar ou editar rótulo</button>
+                    <button type="button" role="menuitem" id="mais-criar-area">Criar ou editar área</button>
                 </div>
             </div>`}
             <button class="btn-tema" id="topo-tema" type="button"></button>
