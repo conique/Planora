@@ -1687,12 +1687,23 @@ function finalizarArrastoCol(e, cancelar) {
     a.col.classList.remove('arrastando-origem');
     document.querySelectorAll('.kb-col.drop-esq, .kb-col.drop-dir').forEach(x => x.classList.remove('drop-esq', 'drop-dir'));
     if (cancelar || !a.alvo) return;
-    const nomes = [...document.querySelectorAll('#kanban .kb-col')].map(c => c.dataset.rotulo).filter(n => n !== a.col.dataset.rotulo);
-    let i = nomes.indexOf(a.alvo.dataset.rotulo);
+    /* Reordena apenas a janela visível, mas preserva as colunas ocultas das outras páginas.
+       Antes, somente as cinco colunas renderizadas eram salvas; ordemColunas() anexava a coluna
+       oculta ao final e a ordem global ficava incorreta ao organizar a página 2–6. */
+    const ordemCompleta = ordemColunas();
+    const nomesVisiveis = [...document.querySelectorAll('#kanban .kb-col')]
+        .map(c => c.dataset.rotulo)
+        .filter(n => n !== a.col.dataset.rotulo);
+    let i = nomesVisiveis.indexOf(a.alvo.dataset.rotulo);
+    if (i < 0) return;
     if (a.depois) i++;
-    nomes.splice(i, 0, a.col.dataset.rotulo);
-    preferenciasUsuario.kanbanColunas = nomes;
-    salvarPreferenciasBanco({ ...lerPreferenciasBanco(), kanbanColunas: nomes });
+    nomesVisiveis.splice(i, 0, a.col.dataset.rotulo);
+
+    const inicio = Math.max(0, Math.min(inicioRotulosKanban, ordemCompleta.length));
+    ordemCompleta.splice(inicio, nomesVisiveis.length, ...nomesVisiveis);
+
+    preferenciasUsuario.kanbanColunas = ordemCompleta;
+    salvarPreferenciasBanco({ ...lerPreferenciasBanco(), kanbanColunas: ordemCompleta });
     renderizarKanban();
 }
 window.addEventListener('pointerup', e => finalizarArrastoCol(e, false));
