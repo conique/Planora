@@ -121,7 +121,7 @@
             id="nomePagina"
             class="input-texto"
             type="text"
-            placeholder="Título (Ex: Revisão de BPs)"
+            placeholder="Título (Ex: Revisão de planilhas)"
         >
 
 
@@ -1505,7 +1505,11 @@ function renderizarKanban() {
         ? `<div class="kb-voltar" data-drop-pasta="${pai || ''}" onclick="irParaPasta(${pai ? `'${pai}'` : 'null'})">↰ Voltar para ${escapeHTML(pai ? pastaPorId(pai).nome : 'Workspace')}</div>`
         : '';
     const navegacao = todasColunas.length > ROTULOS_POR_TELA
-        ? `<div class="kb-navegacao"><button type="button" class="kb-seta" onclick="navegarRotulosKanban(-1)" ${inicioRotulosKanban === 0 ? 'hidden' : ''} aria-label="Mostrar rótulos anteriores">←</button><span class="kb-paginacao">${inicioRotulosKanban + 1}–${Math.min(inicioRotulosKanban + ROTULOS_POR_TELA, todasColunas.length)} de ${todasColunas.length}</span><button type="button" class="kb-seta" onclick="navegarRotulosKanban(1)" ${inicioRotulosKanban >= maximoInicio ? 'hidden' : ''} aria-label="Mostrar próximos rótulos">→</button></div>`
+        ? `<div class="kb-navegacao" role="navigation" aria-label="Navegação das colunas do Kanban">
+            <button type="button" class="kb-seta kb-seta-anterior" onclick="navegarRotulosKanban(-1)" ${inicioRotulosKanban === 0 ? 'disabled' : ''} aria-label="Mostrar rótulos anteriores" title="Mostrar rótulos anteriores">‹</button>
+            <span class="kb-paginacao">${inicioRotulosKanban + 1}–${Math.min(inicioRotulosKanban + ROTULOS_POR_TELA, todasColunas.length)} de ${todasColunas.length}</span>
+            <button type="button" class="kb-seta kb-seta-proxima" onclick="navegarRotulosKanban(1)" ${inicioRotulosKanban >= maximoInicio ? 'disabled' : ''} aria-label="Mostrar próximos rótulos" title="Mostrar próximos rótulos">›</button>
+        </div>`
         : '';
     kb.innerHTML = voltar + navegacao + '<div class="kb-board">' + colunas.filter(c => nomesVisiveis.includes(c.nome)).map(c => `
         <section class="kb-col" data-rotulo="${escapeHTML(c.nome)}">

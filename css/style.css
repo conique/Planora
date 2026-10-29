@@ -688,13 +688,112 @@ html[data-auth="login"] body>:not(.lg-overlay):not(script){visibility:hidden}
 .kb-seta:active{transform:translateY(0) scale(.96)}
 .kb-paginacao{min-width:78px;color:var(--texto-2);font-size:12px;font-weight:600;letter-spacing:.01em}
 
-/* Logos livres: sem cartão, fundo, máscara arredondada ou sombra ao redor */
-.lg-logo,.ws-marca{overflow:visible!important;border-radius:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
-.lg-logo img,.ws-marca img{width:100%!important;height:100%!important;object-fit:contain!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
-.marca-P{overflow:visible!important;border-radius:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
-.marca-P img{display:block;object-fit:contain;background:transparent;border-radius:0;box-shadow:none}
+/* Navegação do Kanban no mesmo formato da linha "Voltar para Workspace" */
+.kb-navegacao{
+  display:grid;
+  grid-template-columns:44px minmax(90px,1fr) 44px;
+  align-items:center;
+  width:auto;
+  min-height:40px;
+  gap:8px;
+  margin:0 max(24px,calc((100% - 1332px)/2)) 14px;
+  padding:4px 8px;
+  border:1px dashed var(--borda-forte);
+  border-radius:var(--raio-m);
+  background:transparent;
+}
+.kb-seta{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:36px;
+  height:30px;
+  padding:0;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:var(--texto-2);
+  font:600 22px/1 Arial,sans-serif;
+  box-shadow:none;
+  cursor:pointer;
+  transition:background .15s ease,color .15s ease,opacity .15s ease;
+}
+.kb-seta::before{content:none!important}
+.kb-seta-anterior{justify-self:start}
+.kb-seta-proxima{justify-self:end}
+.kb-seta:hover:not(:disabled){background:var(--surface-2);color:var(--texto);transform:none;box-shadow:none;border-color:transparent}
+.kb-seta:active:not(:disabled){background:var(--surface-3);transform:none}
+.kb-seta:disabled{opacity:.28;cursor:default}
+.kb-paginacao{justify-self:center;min-width:0;text-align:center;color:var(--texto-2);font-size:12px;font-weight:600;letter-spacing:.01em}
+@media(max-width:700px){
+  .kb-navegacao{grid-template-columns:40px 1fr 40px;margin:0 12px 10px;padding:4px 6px}
+  .kb-seta{width:34px;height:30px}
+}
 
-/* Footer da tela de workspaces: fora do conteúdo central e em largura total */
-.ws-overlay{display:flex!important;flex-direction:column!important;min-height:100dvh;padding:0!important;overflow-y:auto}
-.ws-conteudo{flex:1 0 auto;min-height:0!important;width:100%;max-width:880px;margin:0 auto;padding:clamp(32px,7vh,80px) 24px 32px}
-.ws-footer-padrao{position:relative;z-index:5;flex:0 0 auto;width:100%;max-width:none;margin:0;padding:16px 24px;box-sizing:border-box}
+/* Correção final: mesma caixa de Voltar para Workspace e conteúdo nas três posições */
+#kanban .kb-navegacao{
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  width:auto!important;
+  min-width:0!important;
+  min-height:0!important;
+  height:auto!important;
+  margin:0 max(24px,calc((100% - 1332px)/2)) 14px!important;
+  padding:8px 54px!important;
+  gap:0!important;
+  border:1px dashed var(--borda-forte)!important;
+  border-radius:var(--raio-m)!important;
+  background:transparent!important;
+  font-size:13px!important;
+  line-height:18px!important;
+}
+#kanban .kb-navegacao .kb-seta{
+  position:absolute!important;
+  top:50%!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  box-sizing:border-box!important;
+  width:36px!important;
+  height:28px!important;
+  min-width:36px!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:7px!important;
+  background:transparent!important;
+  color:var(--texto-2)!important;
+  font-family:Arial,sans-serif!important;
+  font-size:24px!important;
+  font-weight:400!important;
+  line-height:1!important;
+  box-shadow:none!important;
+  transform:translateY(-50%)!important;
+}
+#kanban .kb-navegacao .kb-seta::before{content:none!important}
+#kanban .kb-navegacao .kb-seta-anterior{left:8px!important;right:auto!important}
+#kanban .kb-navegacao .kb-seta-proxima{right:8px!important;left:auto!important}
+#kanban .kb-navegacao .kb-seta:hover:not(:disabled){background:var(--surface-2)!important;color:var(--texto)!important;box-shadow:none!important;transform:translateY(-50%)!important}
+#kanban .kb-navegacao .kb-seta:active:not(:disabled){background:var(--surface-3)!important;transform:translateY(-50%)!important}
+#kanban .kb-navegacao .kb-seta:disabled{display:flex!important;opacity:.28!important;cursor:default!important}
+#kanban .kb-navegacao .kb-paginacao{
+  display:block!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0!important;
+  padding:0!important;
+  color:var(--texto-2)!important;
+  font-size:13px!important;
+  font-weight:500!important;
+  line-height:18px!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+}
+@media(max-width:700px){
+  #kanban .kb-navegacao{margin:0 12px 10px!important;padding:8px 50px!important}
+  #kanban .kb-navegacao .kb-seta-anterior{left:6px!important}
+  #kanban .kb-navegacao .kb-seta-proxima{right:6px!important}
+}
